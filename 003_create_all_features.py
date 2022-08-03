@@ -292,6 +292,42 @@ print(f"CV AMEX Score after Rank Features added: {np.round(cv['amex_metric-mean'
 print(f"CV Log Loss after Rank Features added: {np.round(cv['binary_logloss-mean'][-1],4)}") #0.2166
 train[features].reset_index(drop=True).to_feather("train_features/selected_features.f")
 
+#############################
+## Statement Rank Features ##
+#############################
+train = pd.read_feather("train_features/train.f")
+features = np.load("feature_selection/features_10.npy")
+dropcols = [c for c in train.columns if c not in features]
+train.drop(dropcols, axis=1, inplace=True)
+gc.collect()
+
+statement_rank = df.groupby("ind")[numerical].rank(pct=True)
+statement_rank['customer_ID'] = df['customer_ID']
+
+mean_rank_features = generate_features(statement_rank, numerical, feature_type='mean', prefix="statement_rank")
+max_rank_features = generate_features(statement_rank, numerical, feature_type='max', prefix="statement_rank")
+min_rank_features = generate_features(statement_rank, numerical, feature_type='min', prefix="statement_rank")
+std_rank_features = generate_features(statement_rank, numerical, feature_type='std', prefix="statement_rank")
+
+train = pd.concat([train, mean_rank_features.reset_index(drop=True).astype(np.float32),
+                   max_rank_features.reset_index(drop=True).astype(np.float32), min_rank_features.reset_index(drop=True).astype(np.float32),
+                   std_rank_features.reset_index(drop=True).astype(np.float32)], axis=1)
+
+del mean_rank_features, std_rank_features, max_rank_features, min_rank_features
+_ = gc.collect()
+features = [c for c in train.columns]
+cat_features = [c for c in features if c in config.cat_features]
+#n_features = 1675
+#n_features = n_features + config.feature_numbers['rank_last'] + config.feature_numbers['rank_mean'] + config.feature_numbers['rank_min'] + config.feature_numbers['rank_max']
+print(f"Selecting {n_features} out of {train.shape[1]} features")
+features = feature_selection(train, labels.target.values, features, n_features, cat_features=cat_features)
+np.save("feature_selection/features_11.npy", features)
+
+cv = cv_check(pd.concat([labels[['target']], train.reset_index(drop=True)], axis=1), features)
+print(f"CV AMEX Score after Statement Rank Features added: {np.round(cv['amex_metric-mean'][-1],4)}") #00.7948
+print(f"CV Log Loss after Statement Rank Features added: {np.round(cv['binary_logloss-mean'][-1],4)}") #0.2166
+
+
 
 
 
