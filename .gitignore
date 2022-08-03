@@ -1,0 +1,13 @@
+/venv
+__pycache__/
+input/
+trained_models/
+catboost_info/
+test_features/
+test_processed/
+train_features/
+train_processed/
+.idea/
+output/
+test_raw/
+train_raw/
