@@ -30,7 +30,7 @@ for n_features in feature_groups:
 
     from sklearn.model_selection import train_test_split
     y = labels.target.values
-    tr_x, val_x, tr_y, val_y = train_test_split(train[features], y, test_size=config.TEST_SIZE_SPLIT, random_state=SEED)
+    tr_x, val_x, tr_y, val_y = train_test_split(train[features], y, test_size=config.TEST_SIZE_SPLIT, random_state=config.seed)
 
     del train, y
     _ = gc.collect()
@@ -61,7 +61,9 @@ for n_features in feature_groups:
     _ = gc.collect()
     features = summary['selected_features_names']
     np.save(f"feature_selection/top_{n_features}_features.npy", features)
-
+    train = pd.read_feather("train_features/train.f")
+    train_dist = pd.read_feather("train_features/dist_features.f")
+    train = pd.concat([train, train_dist], axis=1)
     train = train[features] # Reset train to contain only selected features
     gc.collect()
 
