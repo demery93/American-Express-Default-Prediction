@@ -134,7 +134,6 @@ def main():
     numerical = [c for c in cols if c not in categoricals]
 
     df = generate_train_test(df, cols, categoricals, numerical)
-    features = np.load("feature_selection/features_11.npy")
 
     cat_features = [c for c in df.columns if c in config.cat_features]
     for c in tqdm(cat_features):
@@ -143,9 +142,11 @@ def main():
     print(f"Selected {df.shape[1]} raw features")
     df['missing_value_feature'] = train_missing_value_feature['missing_value_feature'].values
     df['missing_statement_feature'] = train_missing_statement_feature['missing_statement_feature'].values
+    dist = pd.read_feather("train_features/dist_features.f")
+    df = pd.concat([df, dist], axis=1)
     df.to_feather("train_features/train.f")
 
-    del df, train_missing_value_feature, train_missing_statement_feature
+    del df, train_missing_value_feature, train_missing_statement_feature, dist
     gc.collect()
     print("Train Data Complete")
     ##########
@@ -170,8 +171,10 @@ def main():
 
     df['missing_value_feature'] = test_missing_value_feature['missing_value_feature'].values
     df['missing_statement_feature'] = test_missing_statement_feature['missing_statement_feature'].values
+    dist = pd.read_feather("test_features/dist_features.f")
+    df = pd.concat([df, dist], axis=1)
     df.to_feather("test_features/test.f")
-    del df, test_missing_value_feature, test_missing_statement_feature
+    del df, test_missing_value_feature, test_missing_statement_feature, dist
     gc.collect()
     print("Test Data Complete")
 
