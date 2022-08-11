@@ -5,18 +5,14 @@ from catboost import CatBoostClassifier, Pool, EShapCalcType, EFeaturesSelection
 import gc
 from config import config
 
-feature_groups = [1500,1000,500,200]
+feature_groups = [2500, 2000, 1500,1000,500]
 train = pd.read_feather("train_features/train.f")
-train_dist = pd.read_feather("train_features/dist_features.f")
-train = pd.concat([train, train_dist], axis=1)
 labels = pd.read_csv("input/train_labels.csv")
-
-del train_dist
-gc.collect()
-
 features = [c for c in train.columns if c not in ['customer_ID','target','ind','S_2']]
 print(f"Beginning features selection process with {len(features)} features")
 for n_features in feature_groups:
+    train = pd.read_feather("train_features/train.f")
+    train = train[features]
     print(f"Selecting {n_features} features from initial {train.shape[1]}")
     cat_features = [c for c in features if c in config.cat_features]
     CATBOOST_PARAMS = dict(iterations=5000,
@@ -61,9 +57,3 @@ for n_features in feature_groups:
     _ = gc.collect()
     features = summary['selected_features_names']
     np.save(f"feature_selection/top_{n_features}_features.npy", features)
-    train = pd.read_feather("train_features/train.f")
-    train_dist = pd.read_feather("train_features/dist_features.f")
-    train = pd.concat([train, train_dist], axis=1)
-    train = train[features] # Reset train to contain only selected features
-    gc.collect()
-
