@@ -23,15 +23,62 @@ def generate_self_distance(df, index, sc=None):
     min = df.groupby("customer_ID").min()
     max = df.groupby("customer_ID").max()
 
-    first_last_distance = np.mean(np.sqrt((last[numerical] - first[numerical]) ** 2), axis=1)
-    mean_last_distance = np.mean(np.sqrt((last[numerical] - mean[numerical]) ** 2), axis=1)
-    min_last_distance = np.mean(np.sqrt((last[numerical] - min[numerical]) ** 2), axis=1)
-    max_last_distance = np.mean(np.sqrt((last[numerical] - max[numerical]) ** 2), axis=1)
-    min_max_distance = np.mean(np.sqrt((min[numerical] - max[numerical]) ** 2), axis=1)
+    data = {}
+    data['mean_first_last_distance'] = np.mean(np.sqrt((last[numerical] - first[numerical]) ** 2), axis=1)
+    data['mean_mean_last_distance'] = np.mean(np.sqrt((last[numerical] - mean[numerical]) ** 2), axis=1)
+    data['mean_min_last_distance'] = np.mean(np.sqrt((last[numerical] - min[numerical]) ** 2), axis=1)
+    data['mean_max_last_distance'] = np.mean(np.sqrt((last[numerical] - max[numerical]) ** 2), axis=1)
+    data['mean_min_max_distance'] = np.mean(np.sqrt((min[numerical] - max[numerical]) ** 2), axis=1)
 
-    dist_df = pd.DataFrame({"first_last_distance":first_last_distance, "mean_last_distance":mean_last_distance,
-                            "min_last_distance":min_last_distance, "max_last_distance": max_last_distance,
-                            "min_max_distance":min_max_distance}, index=first_last_distance.index)
+    data['max_first_last_distance'] = np.max(np.sqrt((last[numerical] - first[numerical]) ** 2), axis=1)
+    data['max_mean_last_distance'] = np.max(np.sqrt((last[numerical] - mean[numerical]) ** 2), axis=1)
+    data['max_min_last_distance'] = np.max(np.sqrt((last[numerical] - min[numerical]) ** 2), axis=1)
+    data['max_max_last_distance'] = np.max(np.sqrt((last[numerical] - max[numerical]) ** 2), axis=1)
+    data['max_min_max_distance'] = np.max(np.sqrt((min[numerical] - max[numerical]) ** 2), axis=1)
+
+    data['min_first_last_distance'] = np.min(np.sqrt((last[numerical] - first[numerical]) ** 2), axis=1)
+    data['min_mean_last_distance'] = np.min(np.sqrt((last[numerical] - mean[numerical]) ** 2), axis=1)
+    data['min_min_last_distance'] = np.min(np.sqrt((last[numerical] - min[numerical]) ** 2), axis=1)
+    data['min_max_last_distance'] = np.min(np.sqrt((last[numerical] - max[numerical]) ** 2), axis=1)
+    data['min_min_max_distance'] = np.min(np.sqrt((min[numerical] - max[numerical]) ** 2), axis=1)
+
+    data['mean_first_last_difference'] = np.mean(last[numerical] - first[numerical], axis=1)
+    data['mean_mean_last_difference'] = np.mean(last[numerical] - mean[numerical], axis=1)
+    data['mean_min_last_difference']= np.mean(last[numerical] - min[numerical], axis=1)
+    data['mean_max_last_difference'] = np.mean(last[numerical] - max[numerical], axis=1)
+    data['mean_min_max_difference'] = np.mean(min[numerical] - max[numerical], axis=1)
+
+    data['max_first_last_difference'] = np.max(last[numerical] - first[numerical], axis=1)
+    data['max_mean_last_difference'] = np.max(last[numerical] - mean[numerical], axis=1)
+    data['max_min_last_difference'] = np.max(last[numerical] - min[numerical], axis=1)
+    data['max_max_last_difference'] = np.max(last[numerical] - max[numerical], axis=1)
+    data['max_min_max_difference'] = np.max(min[numerical] - max[numerical], axis=1)
+
+    data['min_first_last_difference'] = np.min(last[numerical] - first[numerical], axis=1)
+    data['min_mean_last_difference'] = np.min(last[numerical] - mean[numerical], axis=1)
+    data['min_min_last_difference'] = np.min(last[numerical] - min[numerical], axis=1)
+    data['min_max_last_difference'] = np.min(last[numerical] - max[numerical], axis=1)
+    data['min_min_max_difference'] = np.min(min[numerical] - max[numerical], axis=1)
+
+    data['mean_first_last_ratio'] = np.mean(last[numerical] / first[numerical], axis=1)
+    data['mean_mean_last_ratio'] = np.mean(last[numerical] / mean[numerical], axis=1)
+    data['mean_min_last_ratio']= np.mean(last[numerical] / min[numerical], axis=1)
+    data['mean_max_last_ratio'] = np.mean(last[numerical] / max[numerical], axis=1)
+    data['mean_min_max_ratio'] = np.mean(max[numerical] / min[numerical], axis=1)
+
+    data['max_first_last_ratio'] = np.max(last[numerical] / first[numerical], axis=1)
+    data['max_mean_last_ratio'] = np.max(last[numerical] / mean[numerical], axis=1)
+    data['max_min_last_ratio'] = np.max(last[numerical] / min[numerical], axis=1)
+    data['max_max_last_ratio'] = np.max(last[numerical] / max[numerical], axis=1)
+    data['max_min_max_ratio'] = np.max(max[numerical] / min[numerical], axis=1)
+
+    data['min_first_last_ratio'] = np.min(last[numerical] / first[numerical], axis=1)
+    data['min_mean_last_ratio'] = np.min(last[numerical] / mean[numerical], axis=1)
+    data['min_min_last_ratio'] = np.min(last[numerical] / min[numerical], axis=1)
+    data['min_max_last_ratio'] = np.min(last[numerical] / max[numerical], axis=1)
+    data['min_min_max_ratio'] = np.min(max[numerical] / min[numerical], axis=1)
+
+    dist_df = pd.DataFrame(data, index=data['mean_first_last_distance'].index)
 
     dist_df = index[['customer_ID']].merge(dist_df.reset_index())
     dist_df.drop('customer_ID', inplace=True, axis=1)
