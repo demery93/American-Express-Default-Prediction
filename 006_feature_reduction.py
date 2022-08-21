@@ -5,7 +5,7 @@ from catboost import CatBoostClassifier, Pool, EShapCalcType, EFeaturesSelection
 import gc
 from config import config
 
-feature_groups = [2500, 2000, 1500,1000,500]
+feature_groups = [2500, 1500, 500]
 train = pd.read_feather("train_features/train.f")
 labels = pd.read_csv("input/train_labels.csv")
 features = [c for c in train.columns if c not in ['customer_ID','target','ind','S_2']]
@@ -45,7 +45,7 @@ for n_features in feature_groups:
         features_for_select=features,
         num_features_to_select=n_features,
         steps=config.STEPS_TO_SELECT,
-        algorithm=EFeaturesSelectionAlgorithm.RecursiveByShapValues,
+        algorithm=EFeaturesSelectionAlgorithm.RecursiveByLossFunctionChange,
         shap_calc_type=EShapCalcType.Regular,
         train_final_model=False,
         verbose=True,
