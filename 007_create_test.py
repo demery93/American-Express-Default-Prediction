@@ -7,65 +7,64 @@ from tqdm import tqdm
 
 import gc
 
+def select(df, features):
+    cols = [c for c in df.columns if c in features]
+    return df[cols]
+
 
 def generate_train_test(df, cols, categoricals, numerical):
+    feats = np.load("feature_selection/top_2500_features.npy")
+
     for c in numerical:
         df[c] = ((df[c] // 0.01) / 100).astype(np.float32)
 
     df_diff = df.copy()
     df_diff['ind'] = df_diff['ind'] + 1
-    df_diff = df[['customer_ID', 'ind']].merge(df_diff, on=['customer_ID', 'ind'], how='left')
+    df_diff = df[['customer_ID','ind']].merge(df_diff, on=['customer_ID','ind'], how='left')
     df_diff[numerical] = df[numerical] - df_diff[numerical]
 
-    last_features = generate_features(df, cols, feature_type='last', prefix="", dropna=False).astype('float32')
-    mean_features = generate_features(df, numerical, feature_type='mean', prefix="").astype('float32')
-    min_features = generate_features(df, numerical, feature_type='min', prefix="").astype('float32')
-    max_features = generate_features(df, numerical, feature_type='max', prefix="").astype('float32')
-    std_features = generate_features(df, numerical, feature_type='std', prefix="").astype('float32')
-    count_features = generate_features(df, categoricals, feature_type='count', prefix="").astype('float32')
-    unique_features = generate_features(df, categoricals, feature_type='nunique', prefix="").astype('float32')
-    first_features = generate_features(df, cols, feature_type='first', prefix="", dropna=False).astype('float32')
-    print("Created Feature Batch 1")
-    recent_mean_features = generate_features(df, numerical, feature_type='mean', prefix="recent", recent=10).astype(
-        'float32')
-    recent_min_features = generate_features(df, numerical, feature_type='min', prefix="recent", recent=10).astype(
-        'float32')
-    recent_max_features = generate_features(df, numerical, feature_type='max', prefix="recent", recent=10).astype(
-        'float32')
-    recent_std_features = generate_features(df, numerical, feature_type='std', prefix="recent", recent=10).astype(
-        'float32')
-    print("Created Feature Batch 2")
-    first_last_diff_features = generate_difference_ratio_features(df, numerical, numerator='last', denominator='first',
-                                                                  type='difference').astype('float32')
-    lag_last_diff_features = generate_difference_ratio_features(df, numerical, numerator='last', denominator='lag',
-                                                                type='difference').astype('float32')
-    mean_last_diff_features = generate_difference_ratio_features(df, numerical, numerator='last', denominator='mean',
-                                                                 type='difference').astype('float32')
-    first_last_ratio_features = generate_difference_ratio_features(df, numerical, numerator='last', denominator='first',
-                                                                   type='ratio').astype('float32')
-    lag_last_ratio_features = generate_difference_ratio_features(df, numerical, numerator='last', denominator='lag',
-                                                                 type='ratio').astype('float32')
-    mean_last_ratio_features = generate_difference_ratio_features(df, numerical, numerator='last', denominator='mean',
-                                                                  type='ratio').astype('float32')
-    max_last_features = generate_difference_ratio_features(df, numerical, numerator='last', denominator='max',
-                                                           type='difference').astype('float32')
-    min_last_features = generate_difference_ratio_features(df, numerical, numerator='last', denominator='min',
-                                                           type='difference').astype('float32')
-    max_last_ratio_features = generate_difference_ratio_features(df, numerical, numerator='last', denominator='max',
-                                                                 type='ratio').astype('float32')
-    min_last_ratio_features = generate_difference_ratio_features(df, numerical, numerator='last', denominator='min',
-                                                                 type='ratio').astype('float32')
+    last_features = select(generate_features(df, cols, feature_type='last', prefix=""), feats).astype('float32')
+    mean_features = select(generate_features(df, numerical, feature_type='mean', prefix=""), feats).astype('float32')
+    min_features = select(generate_features(df, numerical, feature_type='min', prefix=""), feats).astype('float32')
+    max_features = select(generate_features(df, numerical, feature_type='max', prefix=""), feats).astype('float32')
+    std_features = select(generate_features(df, numerical, feature_type='std', prefix=""), feats).astype('float32')
+    count_features = select(generate_features(df, categoricals, feature_type='count', prefix=""), feats).astype('float32')
+    unique_features = select(generate_features(df, categoricals, feature_type='nunique', prefix=""), feats).astype('float32')
+    first_features = select(generate_features(df, cols, feature_type='first', prefix=""), feats).astype('float32')
+    print("Created Base Features")
 
-    print("Created Feature Batch 3")
-    min_diff_features = generate_features(df_diff, numerical, feature_type='min', prefix="diff").astype('float32')
-    max_diff_features = generate_features(df_diff, numerical, feature_type='max', prefix="diff").astype('float32')
-    mean_diff_features = generate_features(df_diff, numerical, feature_type='mean', prefix="diff").astype('float32')
+    recent_mean_features = select(generate_features(df, numerical, feature_type='mean', prefix="recent", recent=10), feats).astype('float32')
+    recent_min_features = select(generate_features(df, numerical, feature_type='min', prefix="recent", recent=10), feats).astype('float32')
+    recent_max_features = select(generate_features(df, numerical, feature_type='max', prefix="recent", recent=10), feats).astype('float32')
+    recent_std_features = select(generate_features(df, numerical, feature_type='std', prefix="recent", recent=10), feats).astype('float32')
+    print("Created Recent Features")
 
-    print("Created Feature Batch 4")
+    df_null = df.copy()
+    df_null[cols] = df_null[cols].isnull().astype(np.int8)
+    last_null_features = select(generate_features(df_null, cols, feature_type='last', prefix="null"), feats).astype(np.int8)
+    sum_null_features = select(generate_features(df_null, cols, feature_type='sum', prefix="null"), feats).astype(np.int8)
+    min_null_features = select(generate_features(df_null, cols, feature_type='min', prefix="null"), feats).astype(np.int8)
+    max_null_features = select(generate_features(df_null, cols, feature_type='max', prefix="null"), feats).astype(np.int8)
+    first_null_features = select(generate_features(df_null, cols, feature_type='first', prefix="null"), feats).astype(np.int8)
+    print("Created Null Features")
 
-    ########################
-    ## Self Rank Features ##
-    ########################
+    first_last_diff_features = select(generate_difference_ratio_features(df, numerical, numerator='last', denominator='first', type='difference'), feats).astype('float32')
+    lag_last_diff_features = select(generate_difference_ratio_features(df, numerical, numerator='last', denominator='lag', type='difference'), feats).astype('float32')
+    mean_last_diff_features = select(generate_difference_ratio_features(df, numerical, numerator='last', denominator='mean', type='difference'), feats).astype('float32')
+    first_last_ratio_features = select(generate_difference_ratio_features(df, numerical, numerator='last', denominator='first', type='ratio'), feats).astype('float32')
+    lag_last_ratio_features = select(generate_difference_ratio_features(df, numerical, numerator='last', denominator='lag', type='ratio'), feats).astype('float32')
+    mean_last_ratio_features = select(generate_difference_ratio_features(df, numerical, numerator='last', denominator='mean', type='ratio'), feats).astype('float32')
+    max_last_features = select(generate_difference_ratio_features(df, numerical, numerator='last', denominator='max', type='difference'), feats).astype('float32')
+    min_last_features = select(generate_difference_ratio_features(df, numerical, numerator='last', denominator='min', type='difference'), feats).astype('float32')
+    max_last_ratio_features = select(generate_difference_ratio_features(df, numerical, numerator='last', denominator='max',type='ratio'), feats).astype('float32')
+    min_last_ratio_features = select(generate_difference_ratio_features(df, numerical, numerator='last', denominator='min',type='ratio'), feats).astype('float32')
+    print("Created Difference/Ratio Features")
+
+    min_diff_features = select(generate_features(df_diff, numerical, feature_type='min', prefix="diff"), feats).astype('float32')
+    max_diff_features = select(generate_features(df_diff, numerical, feature_type='max', prefix="diff"), feats).astype('float32')
+    mean_diff_features = select(generate_features(df_diff, numerical, feature_type='mean', prefix="diff"), feats).astype('float32')
+    print("Created Differenced Features")
+
     max_df = df.groupby('customer_ID')[numerical].max()
     max_df = df[['customer_ID']].merge(max_df, on='customer_ID')
     rank_df = (df[numerical] == max_df[numerical]).astype(int)
@@ -75,7 +74,7 @@ def generate_train_test(df, cols, categoricals, numerical):
         rank_df[c] = df['ind'].values * rank_df[c]
 
     rank_df['customer_ID'] = df['customer_ID'].values
-    argmax_features = generate_features(rank_df, numerical, feature_type='max', prefix="argmax").astype(int)
+    argmax_features = select(generate_features(rank_df, numerical, feature_type='max', prefix="argmax").astype(int), feats)
 
     del rank_df
     _ = gc.collect()
@@ -89,52 +88,47 @@ def generate_train_test(df, cols, categoricals, numerical):
         rank_df[c] = df['ind'].values * rank_df[c]
 
     rank_df['customer_ID'] = df['customer_ID'].values
-    argmin_features = generate_features(rank_df, numerical, feature_type='max', prefix="argmin").astype(int)
+    argmin_features = select(generate_features(rank_df, numerical, feature_type='max', prefix="argmin").astype(int), feats)
 
     del rank_df
     _ = gc.collect()
-    argmin_features = argmin_features.astype(int)
-    argmax_features = argmax_features.astype(int)
-    print("Created Feature Batch 5")
+    print("Created Argmin/Argmax Features")
+
     rank_df = df.copy()
     for c in tqdm(numerical):
         rank_df[c] = rank_df[c].rank(pct=True)
 
-    last_rank_features = generate_features(rank_df, numerical, feature_type='last', prefix="rank").astype('float32')
-    mean_rank_features = generate_features(rank_df, numerical, feature_type='mean', prefix="rank").astype('float32')
-    max_rank_features = generate_features(rank_df, numerical, feature_type='max', prefix="rank").astype('float32')
-    min_rank_features = generate_features(rank_df, numerical, feature_type='min', prefix="rank").astype('float32')
-    print("Created Feature Batch 6")
+    last_rank_features = select(generate_features(rank_df, numerical, feature_type='last', prefix="rank"), feats).astype('float32')
+    mean_rank_features = select(generate_features(rank_df, numerical, feature_type='mean', prefix="rank"), feats).astype('float32')
+    max_rank_features = select(generate_features(rank_df, numerical, feature_type='max', prefix="rank"), feats).astype('float32')
+    min_rank_features = select(generate_features(rank_df, numerical, feature_type='min', prefix="rank"), feats).astype('float32')
+    print("Created Rank Features")
 
-    df = pd.concat([last_features, mean_features, min_features, max_features, std_features, first_features,
-                    count_features.astype(np.int8),
-                    unique_features.astype(np.int8), recent_mean_features, recent_min_features, recent_max_features,
-                    recent_std_features,
-                    first_last_diff_features, first_last_ratio_features, lag_last_diff_features,
-                    lag_last_ratio_features,
+    df = pd.concat([last_features, mean_features, min_features, max_features, std_features, first_features, count_features,
+                    unique_features, recent_mean_features, recent_min_features, recent_max_features, recent_std_features,
+                    first_last_diff_features, first_last_ratio_features, lag_last_diff_features, lag_last_ratio_features,
                     mean_last_diff_features, mean_last_ratio_features, min_diff_features, max_diff_features,
-                    max_last_features, min_last_features, argmax_features.astype(np.int8),
-                    argmin_features.astype(np.int8), last_rank_features,
-                    mean_rank_features, max_rank_features, min_rank_features, max_last_ratio_features,
-                    min_last_ratio_features, mean_diff_features], axis=1)
+                    max_last_features, min_last_features, argmax_features, argmin_features, last_rank_features,
+                    mean_rank_features, max_rank_features, min_rank_features, max_last_ratio_features, min_last_ratio_features,mean_diff_features,
+                    last_null_features, sum_null_features, min_null_features, max_null_features, first_null_features], axis=1)
 
-    del last_features, mean_features, min_features, max_features, std_features, first_features, count_features, \
-        unique_features, recent_mean_features, recent_min_features, recent_max_features, recent_std_features, \
-        first_last_diff_features, first_last_ratio_features, lag_last_diff_features, lag_last_ratio_features, \
+    del last_features, mean_features, min_features, max_features, std_features, first_features, count_features,\
+        unique_features, recent_mean_features, recent_min_features, recent_max_features, recent_std_features,\
+        first_last_diff_features, first_last_ratio_features, lag_last_diff_features, lag_last_ratio_features,\
         mean_last_diff_features, mean_last_ratio_features, min_diff_features, max_diff_features, \
-        max_last_features, min_last_features, argmax_features, argmin_features, last_rank_features, \
-        mean_rank_features, max_rank_features, min_rank_features, max_last_ratio_features, min_last_ratio_features, mean_diff_features
+        max_last_features, min_last_features, argmax_features, argmin_features, last_rank_features,\
+        mean_rank_features, max_rank_features, min_rank_features, max_last_ratio_features, min_last_ratio_features, \
+        mean_diff_features, last_null_features, sum_null_features, min_null_features, max_null_features, first_null_features
 
     gc.collect()
-    print(f"Created {df.shape[1]} raw features")
-
+    print(f"Created {df.shape[1]} features")
     return df.reset_index(drop=True)
-
 
 def main():
     print("Preparing Test Data")
     df = pd.read_feather("test_processed/test_with_index.f")
     sub = pd.read_csv("input/sample_submission.csv")
+    feats = np.load("feature_selection/top_2500_features.npy")
     df = df.replace(-1, np.nan)
 
     test_missing_value_feature = pd.read_feather("test_features/test_missing_value_feature.f")
@@ -159,6 +153,7 @@ def main():
     df['missing_statement_feature'] = test_missing_statement_feature['missing_statement_feature'].values
     dist = pd.read_feather("test_features/dist_features.f")
     df = pd.concat([df, dist], axis=1)
+    df = select(df, feats)
     print("Test shape", df.shape)
     df.to_feather("test_features/test.f")
     del df, test_missing_value_feature, test_missing_statement_feature, dist

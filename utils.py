@@ -8,15 +8,69 @@ import lightgbm as lgb
 import pickle
 import joblib
 import pathlib
+from scipy import optimize
+from scipy import special
 
-def to_feature(df, path):
-    if df.columns.duplicated().sum() > 0:
-        raise Exception(f'duplicated!: {df.columns[df.columns.duplicated()]}')
-    df.reset_index(inplace=True, drop=True)
-    df.columns = [c.replace('/', '-').replace(' ', '-') for c in df.columns]
-    for c in df.columns:
-        df[[c]].to_feather(f'{path}_{c}.f')
-    return
+class FocalLoss:
+
+    def __init__(self, gamma, alpha=None):
+        self.alpha = alpha
+        self.gamma = gamma
+
+    def at(self, y):
+        if self.alpha is None:
+            return np.ones_like(y)
+        return np.where(y, self.alpha, 1 - self.alpha)
+
+    def pt(self, y, p):
+        p = np.clip(p, 1e-15, 1 - 1e-15)
+        return np.where(y, p, 1 - p)
+
+    def __call__(self, y_true, y_pred):
+        at = self.at(y_true)
+        pt = self.pt(y_true, y_pred)
+        return -at * (1 - pt) ** self.gamma * np.log(pt)
+
+    def grad(self, y_true, y_pred):
+        y = 2 * y_true - 1  # {0, 1} -> {-1, 1}
+        at = self.at(y_true)
+        pt = self.pt(y_true, y_pred)
+        g = self.gamma
+        return at * y * (1 - pt) ** g * (g * pt * np.log(pt) + pt - 1)
+
+    def hess(self, y_true, y_pred):
+        y = 2 * y_true - 1  # {0, 1} -> {-1, 1}
+        at = self.at(y_true)
+        pt = self.pt(y_true, y_pred)
+        g = self.gamma
+
+        u = at * y * (1 - pt) ** g
+        du = -at * y * g * (1 - pt) ** (g - 1)
+        v = g * pt * np.log(pt) + pt - 1
+        dv = g * np.log(pt) + g + 1
+
+        return (du * v + u * dv) * y * (pt * (1 - pt))
+
+    def init_score(self, y_true):
+        res = optimize.minimize_scalar(
+            lambda p: self(y_true, p).sum(),
+            bounds=(0, 1),
+            method='bounded'
+        )
+        p = res.x
+        log_odds = np.log(p / (1 - p))
+        return log_odds
+
+    def lgb_obj(self, preds, train_data):
+        y = train_data.get_label()
+        p = special.expit(preds)
+        return self.grad(y, p), self.hess(y, p)
+
+    def lgb_eval(self, preds, train_data):
+        y = train_data.get_label()
+        p = special.expit(preds)
+        is_higher_better = False
+        return 'focal_loss', self(y, p).mean(), is_higher_better
 
 @contextmanager
 def timer(name):
@@ -24,44 +78,6 @@ def timer(name):
     yield
     print(f'[{name}] done in {time.time() - t0:.0f} s')
 
-
-def reduce_mem_usage(df):
-    """ iterate through all the columns of a dataframe and modify the data type
-        to reduce memory usage.
-    """
-    start_mem = df.memory_usage().sum() / 1024 ** 2
-    print('Memory usage of dataframe is {:.2f} MB'.format(start_mem))
-
-    for col in df.columns:
-        col_type = df[col].dtype
-
-        if col_type != object:
-            c_min = df[col].min()
-            c_max = df[col].max()
-            if str(col_type)[:3] == 'int':
-                if c_min > np.iinfo(np.int8).min and c_max < np.iinfo(np.int8).max:
-                    df[col] = df[col].astype(np.int8)
-                elif c_min > np.iinfo(np.int16).min and c_max < np.iinfo(np.int16).max:
-                    df[col] = df[col].astype(np.int16)
-                elif c_min > np.iinfo(np.int32).min and c_max < np.iinfo(np.int32).max:
-                    df[col] = df[col].astype(np.int32)
-                elif c_min > np.iinfo(np.int64).min and c_max < np.iinfo(np.int64).max:
-                    df[col] = df[col].astype(np.int64)
-            else:
-                if c_min > np.finfo(np.float16).min and c_max < np.finfo(np.float16).max:
-                    df[col] = df[col].astype(np.float16)
-                elif c_min > np.finfo(np.float32).min and c_max < np.finfo(np.float32).max:
-                    df[col] = df[col].astype(np.float32)
-                else:
-                    df[col] = df[col].astype(np.float64)
-        else:
-            df[col] = df[col].astype('category')
-
-    end_mem = df.memory_usage().sum() / 1024 ** 2
-    print('Memory usage after optimization is: {:.2f} MB'.format(end_mem))
-    print('Decreased by {:.1f}%'.format(100 * (start_mem - end_mem) / start_mem))
-
-    return df
 
 # Display/plot feature importance
 def display_importances(feature_importance_df_, score):
@@ -194,33 +210,3 @@ def floorify_frac(x, interval=1):
     if np.max(xt)<=127:
         return xt.astype(np.int8)
     return xt.astype(np.int16)
-
-class SaveModelCallback:
-    def __init__(self,
-                 models_folder: pathlib.Path,
-                 fold_id: int,
-                 min_score_to_save: float,
-                 every_k: int,
-                 order: int = 0):
-        self.min_score_to_save: float = min_score_to_save
-        self.every_k: int = every_k
-        self.current_score = min_score_to_save
-        self.order: int = order
-        self.models_folder: pathlib.Path = models_folder
-        self.fold_id: int = fold_id
-
-    def __call__(self, env):
-        iteration = env.iteration
-        score = env.evaluation_result_list[3][2]
-        if iteration % self.every_k == 0:
-            print(f'iteration {iteration}, score={score:.05f}')
-            if score > self.current_score:
-                self.current_score = score
-                for fname in self.models_folder.glob(f'fold_id_{self.fold_id}*'):
-                    fname.unlink()
-                print(f'High Score: iteration {iteration}, score={score:.05f}')
-                joblib.dump(env.model, self.models_folder / f'fold_id_{self.fold_id}_{score:.05f}.pkl')
-
-
-def save_model(models_folder: pathlib.Path, fold_id: int, min_score_to_save: float = 0.78, every_k: int = 50):
-    return SaveModelCallback(models_folder=models_folder, fold_id=fold_id, min_score_to_save=min_score_to_save, every_k=every_k)

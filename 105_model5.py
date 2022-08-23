@@ -1,8 +1,3 @@
-'''
-Model 1 - LightGBM Model with DART Booster
-Features Used - 2,500
-CV Score:
-'''
 import pandas as pd
 import numpy as np
 import lightgbm as lgb
@@ -23,31 +18,57 @@ sub = pd.read_csv("input/sample_submission.csv")
 features = np.load(f"feature_selection/top_2500_features.npy")
 
 y = labels['target'].values
-
 train = train[features]
 test = test[features]
 gc.collect()
 
+'''
+[100]	training's amex_metric: 0.751771	valid_1's amex_metric: 0.753409
+[200]	training's amex_metric: 0.76113	valid_1's amex_metric: 0.761548
+[300]	training's amex_metric: 0.768304	valid_1's amex_metric: 0.768474
+[400]	training's amex_metric: 0.773516	valid_1's amex_metric: 0.774123
+[500]	training's amex_metric: 0.779303	valid_1's amex_metric: 0.778707
+[600]	training's amex_metric: 0.784227	valid_1's amex_metric: 0.781059
+[700]	training's amex_metric: 0.787444	valid_1's amex_metric: 0.784697
+[800]	training's amex_metric: 0.789961	valid_1's amex_metric: 0.786534
+[900]	training's amex_metric: 0.79219	valid_1's amex_metric: 0.78868
+[1000]	training's amex_metric: 0.794307	valid_1's amex_metric: 0.790418
+'''
+
+def weighted_logloss(preds, data):
+    #numerically stable sigmoid:
+    y_true = data.get_label()
+    preds_rank = pd.Series(preds).rank(pct=True)
+    preds = 1. / (1. + np.exp(-preds))
+    weights = np.where(preds_rank >= 0.96, 2, 1)
+
+    grad = -(y_true - preds)
+    hess = preds * (1.0 - preds)
+
+    grad = grad*weights
+    hess = hess*weights
+    return grad, hess
+
 params = {'objective': 'binary',
-          'metric': "amex_metric",
-          'boosting': 'dart',
-          'seed': 42,
-          'num_leaves': 100,
+          'metric': 'custom',
           'learning_rate': 0.01,
-          'feature_fraction': 0.20,
-          'bagging_freq': 10,
-          'bagging_fraction': 0.50,
-          'n_jobs': -1,
-          'lambda_l2': 2,
-          'min_data_in_leaf': 40
-          }
+          'max_depth': 5,
+          'num_leaves': 2 ** 5 - 1,
+          'max_bin': 255,
+          'min_child_weight': 200,
+          'colsample_bytree': 0.4,
+          'subsample': 0.9,
+          'nthread': 8,
+          'bagging_freq': 1,
+          'verbose': -1,
+          'seed': 42}
 
 kfold = StratifiedKFold(n_splits=config.NFOLDS, random_state=42, shuffle=True)
 oof = np.zeros(len(train))
 preds = np.zeros(len(test))
+print(f"Training on {len(features)} features")
 # Iterate through each fold
 scores = []
-print(f"Training on {len(features)} features")
 for fold, (trn_ind, val_ind) in enumerate(kfold.split(train[features], y)):
     print(f'Training fold {fold + 1}')
     x_train, x_val = train[features].iloc[trn_ind], train[features].iloc[val_ind]
@@ -59,10 +80,11 @@ for fold, (trn_ind, val_ind) in enumerate(kfold.split(train[features], y)):
                       train_set=train_dataset,
                       valid_sets=[train_dataset, val_dataset],
                       num_boost_round=10000,
-                      callbacks=[lgb.log_evaluation(100)],
-                      feval=amex_metric_mod_lgbm)
+                      callbacks=[lgb.log_evaluation(100), lgb.early_stopping(500)],
+                      feval=amex_metric_mod_lgbm,
+                      fobj=weighted_logloss)
 
-    with open(f"trained_models/model1_{fold}.pkl", 'wb') as file:
+    with open(f"trained_models/model5_{fold}.pkl", 'wb') as file:
         pickle.dump(model, file)
 
     val_pred = model.predict(x_val)
@@ -80,12 +102,13 @@ for fold, (trn_ind, val_ind) in enumerate(kfold.split(train[features], y)):
 
 print(f"Average CV Score {np.mean(scores)}")
 print(f"Full CV Score: {amex_metric_mod(y, oof)}")
-#Average CV Score 0.7982157767542152
-#Full CV Score: 0.7983087782473084
+#Average CV Score 0.7982275708417814
+#Full CV Score: 0.7978578429144019
+
 
 sub['prediction'] = preds
-sub.to_csv(f"output/submission_model1.csv", index=False, header=True)
+sub.to_csv(f"output/submission_model5.csv", index=False, header=True)
 
 oof_df = pd.read_csv("input/train_labels.csv")
 oof_df['prediction'] = oof
-oof_df[['customer_ID','prediction']].to_csv(f"output/validation_model1.csv", index=False, header=True)
+oof_df[['customer_ID','prediction']].to_csv(f"output/validation_model5.csv", index=False, header=True)
