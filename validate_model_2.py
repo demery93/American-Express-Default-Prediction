@@ -14,12 +14,9 @@ from utils import FocalLoss
 
 fl = FocalLoss(alpha=.3, gamma=2)
 
-#nfeats = sys.argv[1]
-nfeats = '2500'
-
 train = pd.read_feather("train_features/train.f")
 labels = pd.read_csv("input/train_labels.csv")
-features = np.load(f"feature_selection/top_{nfeats}_features.npy")
+features = np.load(f"feature_selection/top_2500_features.npy")
 
 params = {'objective': 'binary',
           'metric': 'custom',
@@ -46,8 +43,23 @@ gc.collect()
 dtrain = lgb.Dataset(train, y)
 
 results = lgb.cv(params, dtrain, 9999, nfold=config.NFOLDS, feval=amex_metric_mod_lgbm, fobj=fl.lgb_obj,
-                 callbacks=[lgb.early_stopping(500), lgb.log_evaluation(100)], seed=42)
+                 callbacks=[lgb.early_stopping(500), lgb.log_evaluation(100)], seed=42, return_cvbooster=True,
+                 shuffle=True, stratified=True)
 
 results.keys()
+models = results['cvbooster'].boosters
+for i,model in enumerate(models):
+    with open(f"trained_models/model2_{i}.pkl", 'wb') as file:
+        pickle.dump(model, file)
+
+test = pd.read_feather("test_Features/test.f")
+models = []
+for i in range(5):
+    file = open(f"trained_models/model2_{i}.pkl", 'rb')
+    models.append(pickle.load(file))
+
+pred = np.zeros(len(test))
+for model in models:
+    pred += model.predict(test) / config.NFOLDS
 print(f"Rounds: {len(results['amex_metric-mean'])}, CV: {results['amex_metric-mean'][-1]} + {results['amex_metric-stdv'][-1]}")
 #Rounds: 5661, CV: 0.7976211067941789 + 0.003353433966261368

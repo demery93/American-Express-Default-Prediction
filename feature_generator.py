@@ -6,16 +6,16 @@ from catboost import CatBoostClassifier, Pool, EShapCalcType, EFeaturesSelection
 
 import gc
 
-def generate_features(df, features, feature_type='last', recent=0, prefix=""):
+def generate_features(df, features, feature_type='last', recent=0, prefix="", dropna=True):
     aggs = {}
     for c in features:
         aggs[c] = feature_type
 
     if(recent>0):
-        df_agg = df[df.ind >= recent].groupby('customer_ID').agg(aggs)
+        df_agg = df[df.ind >= recent].groupby('customer_ID', dropna=dropna).agg(aggs)
 
     else:
-        df_agg = df.groupby('customer_ID').agg(aggs)
+        df_agg = df.groupby('customer_ID', dropna=dropna).agg(aggs)
 
     cols = [f"{c}_{prefix}{feature_type}" for c in features]
     df_agg.columns = cols
@@ -53,7 +53,7 @@ def feature_selection(df, y, features, n, cat_features=None):
                            metric_period=100,
                            task_type='GPU',
                            od_type='Iter',
-                           od_wait=20,
+                           od_wait=50,
                            random_seed=config.seed,
                            allow_writing_files=False)
 

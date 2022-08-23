@@ -31,7 +31,7 @@ kfold = StratifiedKFold(n_splits=NFOLD, random_state=42, shuffle=True)
 oof = np.zeros(len(train))
 preds = np.zeros(len(test))
 # Iterate through each fold
-
+scores = []
 for fold, (trn_ind, val_ind) in enumerate(kfold.split(train[features], y)):
     print(f"******* Fold {fold+1} ******* ")
     x_train, x_val = train[features].iloc[trn_ind], train[features].iloc[val_ind]
@@ -40,13 +40,22 @@ for fold, (trn_ind, val_ind) in enumerate(kfold.split(train[features], y)):
     clf = CatBoostClassifier(iterations=10000, random_state=22, task_type = 'GPU', max_depth=8, min_data_in_leaf=8)
     clf.fit(x_train, y_train, eval_set=[(x_val, y_val)], cat_features=cat_features,  verbose=100)
 
-    oof[val_ind] = clf.predict_proba(x_val)[:, 1]
-    print(f"Fold {fold + 1} score: {amex_metric_mod(y_val, oof[val_ind])}")
-    preds += clf.predict_proba(test[features])[:, 1] / NFOLD
-    with open(f"trained_models/catboost_{nfeats}_{fold}.pkl", 'wb') as file:
+    val_pred = clf.predict_proba(x_val)[:, 1]
+    test_pred = clf.predict_proba(test[features])[:, 1]
+
+    val_pred = pd.Series(val_pred).rank(pct=True)
+    test_pred = pd.Series(test_pred).rank(pct=True)
+
+    oof[val_ind] = val_pred
+    preds += test_pred / NFOLD
+    with open(f"trained_models/model3_{fold}.pkl", 'wb') as file:
         pickle.dump(clf, file)
 
+    score = amex_metric_mod(y_val, oof[val_ind])
+    scores.append(score)
+    print(f"Fold {fold + 1} score: {score}")
 
+print(f"Average CV Score {np.mean(scores)}")
 print(f"CV Score: {amex_metric_mod(y, oof)}")
 
 sub = pd.read_csv("input/sample_submission.csv")
