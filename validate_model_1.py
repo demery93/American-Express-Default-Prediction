@@ -40,9 +40,10 @@ gc.collect()
 
 dtrain = lgb.Dataset(train, y)
 
-results = lgb.cv(params, dtrain, 9999, nfold=config.NFOLDS, feval=amex_metric_mod_lgbm,
-                 callbacks=[lgb.early_stopping(500), lgb.log_evaluation(100)], seed=42)
+results = lgb.cv(params, dtrain, 10000, nfold=config.NFOLDS, feval=amex_metric_mod_lgbm,
+                 callbacks=[lgb.early_stopping(500), lgb.log_evaluation(100)], seed=42, return_cvbooster=True)
 
-results.keys()
+
+
 print(f"Rounds: {len(results['amex_metric-mean'])}, CV: {results['amex_metric-mean'][-1]} + {results['amex_metric-stdv'][-1]}")
 #Rounds: 9999, CV: 0.7982327096375794 + 0.0038007911677668195
