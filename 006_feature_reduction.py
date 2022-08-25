@@ -7,6 +7,9 @@ from config import config
 
 feature_groups = [2500, 1500, 500]
 train = pd.read_feather("train_features/train.f")
+#cols = [c.replace('-','_minus_') for c in train.columns]
+#train.columns = cols
+#train.to_feather("train_features/train.f")
 labels = pd.read_csv("input/train_labels.csv")
 features = [c for c in train.columns if c not in ['customer_ID','target','ind','S_2']]
 print(f"Beginning features selection process with {len(features)} features")

@@ -65,59 +65,18 @@ def generate_train_test(df, cols, categoricals, numerical):
     mean_diff_features = select(generate_features(df_diff, numerical, feature_type='mean', prefix="diff"), feats).astype('float32')
     print("Created Differenced Features")
 
-    max_df = df.groupby('customer_ID')[numerical].max()
-    max_df = df[['customer_ID']].merge(max_df, on='customer_ID')
-    rank_df = (df[numerical] == max_df[numerical]).astype(int)
-    del max_df
-    _ = gc.collect()
-    for c in tqdm(numerical):
-        rank_df[c] = df['ind'].values * rank_df[c]
-
-    rank_df['customer_ID'] = df['customer_ID'].values
-    argmax_features = select(generate_features(rank_df, numerical, feature_type='max', prefix="argmax").astype(int), feats)
-
-    del rank_df
-    _ = gc.collect()
-
-    min_df = df.groupby('customer_ID')[numerical].min()
-    min_df = df[['customer_ID']].merge(min_df, on='customer_ID')
-    rank_df = (df[numerical] == min_df[numerical]).astype(int)
-    del min_df
-    _ = gc.collect()
-    for c in tqdm(numerical):
-        rank_df[c] = df['ind'].values * rank_df[c]
-
-    rank_df['customer_ID'] = df['customer_ID'].values
-    argmin_features = select(generate_features(rank_df, numerical, feature_type='max', prefix="argmin").astype(int), feats)
-
-    del rank_df
-    _ = gc.collect()
-    print("Created Argmin/Argmax Features")
-
-    rank_df = df.copy()
-    for c in tqdm(numerical):
-        rank_df[c] = rank_df[c].rank(pct=True)
-
-    last_rank_features = select(generate_features(rank_df, numerical, feature_type='last', prefix="rank"), feats).astype('float32')
-    mean_rank_features = select(generate_features(rank_df, numerical, feature_type='mean', prefix="rank"), feats).astype('float32')
-    max_rank_features = select(generate_features(rank_df, numerical, feature_type='max', prefix="rank"), feats).astype('float32')
-    min_rank_features = select(generate_features(rank_df, numerical, feature_type='min', prefix="rank"), feats).astype('float32')
-    print("Created Rank Features")
-
     df = pd.concat([last_features, mean_features, min_features, max_features, std_features, first_features, count_features,
                     unique_features, recent_mean_features, recent_min_features, recent_max_features, recent_std_features,
                     first_last_diff_features, first_last_ratio_features, lag_last_diff_features, lag_last_ratio_features,
                     mean_last_diff_features, mean_last_ratio_features, min_diff_features, max_diff_features,
-                    max_last_features, min_last_features, argmax_features, argmin_features, last_rank_features,
-                    mean_rank_features, max_rank_features, min_rank_features, max_last_ratio_features, min_last_ratio_features,mean_diff_features,
+                    max_last_features, min_last_features, max_last_ratio_features, min_last_ratio_features,mean_diff_features,
                     last_null_features, sum_null_features, min_null_features, max_null_features, first_null_features], axis=1)
 
     del last_features, mean_features, min_features, max_features, std_features, first_features, count_features,\
         unique_features, recent_mean_features, recent_min_features, recent_max_features, recent_std_features,\
         first_last_diff_features, first_last_ratio_features, lag_last_diff_features, lag_last_ratio_features,\
         mean_last_diff_features, mean_last_ratio_features, min_diff_features, max_diff_features, \
-        max_last_features, min_last_features, argmax_features, argmin_features, last_rank_features,\
-        mean_rank_features, max_rank_features, min_rank_features, max_last_ratio_features, min_last_ratio_features, \
+        max_last_features, min_last_features, max_last_ratio_features, min_last_ratio_features, \
         mean_diff_features, last_null_features, sum_null_features, min_null_features, max_null_features, first_null_features
 
     gc.collect()
@@ -128,6 +87,8 @@ def main():
     print("Preparing Test Data")
     df = pd.read_feather("test_processed/test_with_index.f")
     sub = pd.read_csv("input/sample_submission.csv")
+    cols = [c.replace('-','_minus_') for c in df.columns]
+    df.columns = cols
     feats = np.load("feature_selection/top_2500_features.npy")
     df = df.replace(-1, np.nan)
 

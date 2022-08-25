@@ -5,6 +5,7 @@ import gc
 from tqdm import tqdm
 from sklearn.preprocessing import LabelEncoder
 from utils import floorify_frac, floorify_ones_and_zeros, floorify
+from config import config
 
 def denoise(x):
     x['B_2'] = floorify_frac(x['B_2'],1/100)
@@ -210,6 +211,8 @@ def denoise(x):
     for col in x.select_dtypes(include=[float]).columns.tolist():
         x[col] = x[col].astype(np.float32)
 
+    x.drop(config.dropcols, axis=1, inplace=True)
+
     return x
 
 def main():
@@ -229,13 +232,3 @@ def main():
 
 if(__name__ == '__main__'):
     main()
-
-'''df['ind'] = 1
-df['ind'] = df.groupby("customer_ID")['ind'].transform(lambda x: x.cumsum())
-df['ind'] = df.groupby("customer_ID")['ind'].transform(lambda x: x + (13 - x.max()))
-
-# compute "after pay" features
-for bcol in [f'B_{i}' for i in [11, 14, 17]] + ['D_39', 'D_131'] + [f'S_{i}' for i in [16, 23]]:
-    for pcol in ['P_2', 'P_3']:
-        if bcol in df.columns:
-            df[f'{bcol}-{pcol}'] = df[bcol] - df[pcol]'''
